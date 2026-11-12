@@ -1,7 +1,6 @@
 #pragma once
 
 #include <juce_audio_utils/juce_audio_utils.h>
-#include <array>
 
 class GoatranceGaterAudioProcessor : public juce::AudioProcessor
 {
@@ -35,7 +34,7 @@ public:
 private:
     double currentSampleRate = 44100.0;
     double freeRunningPpq = 0.0;
-    float smoothedGate = 1.0f;
+    float envelope = 1.0f;
 
     JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR (GoatranceGaterAudioProcessor)
 };

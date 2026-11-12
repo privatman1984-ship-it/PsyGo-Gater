@@ -1,6 +1,6 @@
 $ErrorActionPreference = 'Stop'
 $Root = (Resolve-Path (Join-Path $PSScriptRoot '..')).Path
-$Output = Join-Path $Root 'GoatranceGater-source.zip'
+$Output = Join-Path $Root 'GoatranceGaterV2-source.zip'
 $Items = @('CMakeLists.txt', 'README.md', 'LICENSE', 'Source', 'scripts') | ForEach-Object { Join-Path $Root $_ }
 if (Test-Path $Output) { Remove-Item $Output }
 Compress-Archive -Path $Items -DestinationPath $Output -Force

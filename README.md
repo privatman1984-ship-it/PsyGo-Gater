@@ -1,33 +1,33 @@
-# Goatrance Gater — VST3 / Standalone
+# Goatrance Gater V2 — VST3 / Standalone
 
-A 16-step rhythmic gate effect for psytrance and goatrance. It follows the host tempo when available, supports loop lengths of 1, 2, or 4 bars, and includes a click-reduced gate, wet/dry mix, and editable step pattern.
+Version 2 adds swing and independently adjustable attack/release smoothing to the tempo-synced 16-step gate. It supports mono/stereo, host tempo/PPQ sync (120 BPM free-run fallback), 1/2/4-bar patterns, depth, wet/dry, and saved step patterns.
 
 ## Build
 
-Requirements: CMake 3.22+, a C++17 compiler, Git, and a supported JUCE build environment. CMake downloads JUCE 8.0.6 on the first configure. VST3 and Standalone formats are built.
+Requirements: CMake 3.22+, C++17 compiler, Git, and the platform's JUCE dependencies. CMake fetches JUCE 8.0.6 during configuration.
 
 ```sh
 cmake -S . -B build -DCMAKE_BUILD_TYPE=Release
 cmake --build build --config Release
 ```
 
-The VST3 bundle is generated under `build/GoatranceGater_artefacts/Release/VST3/` (or the corresponding configuration directory on your platform). Copy the bundle to your system's VST3 plug-in folder and rescan plug-ins in your DAW.
-
-On Linux, install the compiler, CMake, Git, and JUCE's required GUI/audio development dependencies for your distribution before building. On macOS, use Xcode command-line tools; on Windows, use Visual Studio 2022 with C++ desktop development tools.
+The VST3 is placed under `build/GoatranceGaterV2_artefacts/Release/VST3/` (or the matching build configuration directory). This project has not been precompiled; install the resulting bundle and rescan plugins in your DAW.
 
 ## Controls
 
-- **Loop**: repeats the 16-step pattern over 1, 2, or 4 bars.
-- **Depth**: amount of attenuation on inactive steps.
-- **Wet**: blend between the dry signal and gated signal.
-- **Steps 1–16**: click a cell to toggle that step on/off. Active steps pass audio; inactive steps are attenuated.
+- **Loop**: repeat the 16-step sequence over 1, 2, or 4 bars.
+- **Depth**: attenuation applied to inactive steps.
+- **Wet**: blend dry and gated signals.
+- **Attack / Release**: gate envelope times in milliseconds.
+- **Swing**: delays alternating (odd-numbered) steps for a swung rhythm.
+- **Steps 1–16**: toggle whether each step passes the signal.
 
-When the DAW supplies tempo and musical position, the pattern follows them. Otherwise it free-runs at 120 BPM. The plug-in accepts mono and stereo audio and saves its parameters and pattern with the project.
+## Download source ZIP
 
-## Create a ZIP
+Use GitHub's branch ZIP download: [Goatrance Gater V2 source ZIP](https://github.com/privatman1984-ship-it/PsyGo-Gater/archive/refs/heads/v2-goatrance-gater.zip). This is the source archive, not a compiled VST3 binary.
 
-Run `./scripts/package.sh` on macOS/Linux, or `powershell -ExecutionPolicy Bypass -File scripts/package.ps1` on Windows. The script creates `GoatranceGater-source.zip` containing the source project (not precompiled binaries). Build the VST3 separately using the steps above.
+You can also create the ZIP locally: `./scripts/package.sh` on macOS/Linux, or `powershell -ExecutionPolicy Bypass -File scripts/package.ps1` on Windows. The output is `GoatranceGaterV2-source.zip`.
 
 ## License
 
-This project source is provided under the MIT License. JUCE is fetched separately and remains under its own license; review JUCE's licensing terms before distributing compiled plug-ins.
+Project source is MIT licensed. JUCE is fetched separately and remains under its own license; review JUCE licensing terms before distributing compiled plugins.

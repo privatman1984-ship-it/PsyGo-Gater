@@ -1,5 +1,5 @@
 cmake_minimum_required(VERSION 3.22)
-project(GoatranceGater VERSION 1.0.0 LANGUAGES CXX)
+project(GoatranceGaterV2 VERSION 2.0.0 LANGUAGES CXX)
 
 set(CMAKE_CXX_STANDARD 17)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
@@ -14,13 +14,13 @@ FetchContent_Declare(
 )
 FetchContent_MakeAvailable(JUCE)
 
-juce_add_plugin(GoatranceGater
+juce_add_plugin(GoatranceGaterV2
     COMPANY_NAME "PsyGo"
-    BUNDLE_ID "com.psygo.goatrancegater"
+    BUNDLE_ID "com.psygo.goatrancegater.v2"
     PLUGIN_MANUFACTURER_CODE PsyG
-    PLUGIN_CODE GtGt
-    PRODUCT_NAME "Goatrance Gater"
-    DESCRIPTION "Pattern-based trance gate effect"
+    PLUGIN_CODE GtG2
+    PRODUCT_NAME "Goatrance Gater V2"
+    DESCRIPTION "Swinging 16-step trance gate"
     IS_SYNTH FALSE
     NEEDS_MIDI_INPUT FALSE
     NEEDS_MIDI_OUTPUT FALSE
@@ -30,20 +30,20 @@ juce_add_plugin(GoatranceGater
     FORMATS VST3 Standalone
 )
 
-target_sources(GoatranceGater PRIVATE
+target_sources(GoatranceGaterV2 PRIVATE
     Source/PluginProcessor.cpp
     Source/PluginProcessor.h
     Source/PluginEditor.cpp
     Source/PluginEditor.h
 )
 
-target_compile_definitions(GoatranceGater PUBLIC
+target_compile_definitions(GoatranceGaterV2 PUBLIC
     JUCE_WEB_BROWSER=0
     JUCE_USE_CURL=0
     JUCE_VST3_CAN_REPLACE_VST2=0
 )
 
-target_link_libraries(GoatranceGater PRIVATE
+target_link_libraries(GoatranceGaterV2 PRIVATE
     juce::juce_audio_utils
     juce::juce_audio_processors
     juce::juce_gui_extra

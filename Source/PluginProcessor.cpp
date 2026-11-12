@@ -6,6 +6,9 @@ namespace
 constexpr auto loopParameter = "loopBars";
 constexpr auto depthParameter = "depth";
 constexpr auto wetParameter = "wet";
+constexpr auto attackParameter = "attackMs";
+constexpr auto releaseParameter = "releaseMs";
+constexpr auto swingParameter = "swing";
 constexpr double fallbackBpm = 120.0;
 constexpr double beatsPerBar = 4.0;
 }
@@ -24,9 +27,15 @@ juce::AudioProcessorValueTreeState::ParameterLayout GoatranceGaterAudioProcessor
     layout.add (std::make_unique<juce::AudioParameterChoice> (
         loopParameter, "Loop", juce::StringArray { "1 bar", "2 bars", "4 bars" }, 0));
     layout.add (std::make_unique<juce::AudioParameterFloat> (
-        depthParameter, "Depth", juce::NormalisableRange<float> (0.0f, 1.0f, 0.001f), 1.0f));
+        depthParameter, "Depth", juce::NormalisableRange<float> (0.0f, 1.0f, 0.001f), 0.85f));
     layout.add (std::make_unique<juce::AudioParameterFloat> (
         wetParameter, "Wet", juce::NormalisableRange<float> (0.0f, 1.0f, 0.001f), 1.0f));
+    layout.add (std::make_unique<juce::AudioParameterFloat> (
+        attackParameter, "Attack", juce::NormalisableRange<float> (0.1f, 100.0f, 0.1f), 2.0f, "ms"));
+    layout.add (std::make_unique<juce::AudioParameterFloat> (
+        releaseParameter, "Release", juce::NormalisableRange<float> (0.1f, 250.0f, 0.1f), 18.0f, "ms"));
+    layout.add (std::make_unique<juce::AudioParameterFloat> (
+        swingParameter, "Swing", juce::NormalisableRange<float> (0.0f, 0.45f, 0.001f), 0.12f));
 
     for (int step = 0; step < 16; ++step)
         layout.add (std::make_unique<juce::AudioParameterBool> (
@@ -50,7 +59,7 @@ void GoatranceGaterAudioProcessor::prepareToPlay (double sampleRate, int)
 {
     currentSampleRate = sampleRate > 0.0 ? sampleRate : 44100.0;
     freeRunningPpq = 0.0;
-    smoothedGate = 1.0f;
+    envelope = 1.0f;
 }
 
 void GoatranceGaterAudioProcessor::releaseResources() {}
@@ -65,59 +74,65 @@ bool GoatranceGaterAudioProcessor::isBusesLayoutSupported (const BusesLayout& la
 void GoatranceGaterAudioProcessor::processBlock (juce::AudioBuffer<float>& buffer, juce::MidiBuffer& midi)
 {
     juce::ignoreUnused (midi);
-    juce::ScopedNo denormals;
+    juce::ScopedNoDenormals noDenormals;
 
     const auto numSamples = buffer.getNumSamples();
     const auto numChannels = getTotalNumOutputChannels();
     const auto depth = parameters.getRawParameterValue (depthParameter)->load();
     const auto wet = parameters.getRawParameterValue (wetParameter)->load();
+    const auto attackMs = parameters.getRawParameterValue (attackParameter)->load();
+    const auto releaseMs = parameters.getRawParameterValue (releaseParameter)->load();
+    const auto swing = parameters.getRawParameterValue (swingParameter)->load();
     const auto loopChoice = static_cast<int> (parameters.getRawParameterValue (loopParameter)->load());
     const auto loopBeats = beatsPerBar * static_cast<double> (loopChoice + 1);
 
-    auto* playHead = getPlayHead();
-    auto hostPosition = playHead != nullptr ? playHead->getPosition() : juce::Optional<juce::AudioPlayHead::PositionInfo>();
     auto bpm = fallbackBpm;
     auto startPpq = freeRunningPpq;
-    auto useHostPpq = false;
-
-    if (hostPosition.hasValue())
+    if (auto* playHead = getPlayHead())
     {
-        const auto hostBpm = hostPosition->getBpm();
-        const auto hostPpq = hostPosition->getPpqPosition();
-        if (hostBpm.hasValue() && hostPpq.hasValue() && *hostBpm > 0.0)
+        const auto position = playHead->getPosition();
+        if (position.hasValue())
         {
-            bpm = *hostBpm;
-            startPpq = *hostPpq;
-            useHostPpq = true;
+            const auto hostBpm = position->getBpm();
+            const auto hostPpq = position->getPpqPosition();
+            if (hostBpm.hasValue() && hostPpq.hasValue() && *hostBpm > 0.0)
+            {
+                bpm = *hostBpm;
+                startPpq = *hostPpq;
+            }
         }
     }
 
-    const auto gateSmoothing = static_cast<float> (1.0 - std::exp (-1.0 / (currentSampleRate * 0.004)));
     const auto phaseIncrement = bpm / (60.0 * currentSampleRate);
-    auto** channelData = buffer.getArrayOfWritePointers();
+    const auto attackCoefficient = static_cast<float> (1.0 - std::exp (-1.0 / (currentSampleRate * attackMs * 0.001)));
+    const auto releaseCoefficient = static_cast<float> (1.0 - std::exp (-1.0 / (currentSampleRate * releaseMs * 0.001)));
+    auto** channels = buffer.getArrayOfWritePointers();
 
     for (int sample = 0; sample < numSamples; ++sample)
     {
         const auto ppq = startPpq + static_cast<double> (sample) * phaseIncrement;
-        auto cyclePosition = std::fmod (ppq, loopBeats);
-        if (cyclePosition < 0.0)
-            cyclePosition += loopBeats;
-        const auto stepIndex = juce::jlimit (0, 15, static_cast<int> (cyclePosition / loopBeats * 16.0));
-        const auto stepIsOn = parameters.getRawParameterValue ("step" + juce::String (stepIndex + 1))->load() >= 0.5f;
-        const auto targetGate = stepIsOn ? 1.0f : 0.0f;
-        smoothedGate += gateSmoothing * (targetGate - smoothedGate);
-        const auto gatedGain = 1.0f - depth * (1.0f - smoothedGate);
+        auto cycle = std::fmod (ppq, loopBeats);
+        if (cycle < 0.0)
+            cycle += loopBeats;
+
+        auto stepPosition = cycle / loopBeats * 16.0;
+        auto step = static_cast<int> (stepPosition);
+        const auto fraction = stepPosition - static_cast<double> (step);
+        if ((step & 1) != 0 && fraction < swing)
+            step = (step + 15) & 15;
+
+        const auto stepIsOn = parameters.getRawParameterValue ("step" + juce::String (step + 1))->load() >= 0.5f;
+        const auto target = stepIsOn ? 1.0f : 0.0f;
+        const auto coefficient = target > envelope ? attackCoefficient : releaseCoefficient;
+        envelope += coefficient * (target - envelope);
+        const auto gatedGain = 1.0f - depth * (1.0f - envelope);
         const auto gain = 1.0f + wet * (gatedGain - 1.0f);
 
         for (int channel = 0; channel < numChannels; ++channel)
-            channelData[channel][sample] *= gain;
+            channels[channel][sample] *= gain;
     }
 
-    if (! useHostPpq)
-        freeRunningPpq = startPpq + static_cast<double> (numSamples) * phaseIncrement;
-    else
-        freeRunningPpq = startPpq + static_cast<double> (numSamples) * phaseIncrement;
-
+    freeRunningPpq = startPpq + static_cast<double> (numSamples) * phaseIncrement;
     for (int channel = numChannels; channel < getTotalNumInputChannels(); ++channel)
         buffer.clear (channel, 0, numSamples);
 }

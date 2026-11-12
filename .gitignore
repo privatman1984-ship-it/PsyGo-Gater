@@ -1,0 +1,4 @@
+build/
+cmake-build-*/
+GoatranceGater-source.zip
+.DS_Store
